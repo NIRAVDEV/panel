@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 # Set non-interactive for timezone
 export DEBIAN_FRONTEND=noninteractive 
