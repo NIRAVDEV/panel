@@ -8,9 +8,7 @@ echo "🧰 Installing MythicalDash v3 on Ubuntu 20.04 with PHP 8.2"
 apt update && apt upgrade -y
 apt install -y software-properties-common curl ca-certificates apt-transport-https gnupg lsb-release unzip git make dos2unix sudo
 
-# ===== PHP 8.2 via Ondrej PPA =====
-add-apt-repository -y ppa:ondrej/php
-apt update
+
 apt install -y php php-cli php-fpm php-mysql php-mbstring php-xml php-curl php-bcmath php-zip php-redis
 
 # ===== Database & Services =====
