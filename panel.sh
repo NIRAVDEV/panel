@@ -11,7 +11,7 @@ apt install -y software-properties-common curl ca-certificates apt-transport-htt
 # ===== PHP 8.2 via Ondrej PPA =====
 add-apt-repository -y ppa:ondrej/php
 apt update
-apt install -y php8.2 php8.2-cli php8.2-fpm php8.2-mysql php8.2-mbstring php8.2-xml php8.2-curl php8.2-bcmath php8.2-zip php8.2-redis
+apt install -y php php-cli php-fpm php-mysql php-mbstring php-xml php-curl php-bcmath php-zip php-redis
 
 # ===== Database & Services =====
 apt install -y mariadb-server redis-server nginx
