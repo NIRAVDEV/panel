@@ -18,7 +18,7 @@ apt install -y php8.2 php8.2-cli php8.2-fpm php8.2-mysql php8.2-mbstring php8.2-
 
 # === MariaDB, Redis, NGINX ===
 apt install -y mariadb-server redis-server nginx
-service  mariadb nginx redis-server enable --now
+service  mariadb nginx redis-server start
 
 # === Node 20, Yarn, Composer ===
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
