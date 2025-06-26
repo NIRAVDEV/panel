@@ -23,7 +23,7 @@ service nginx start
 service redis-server start
 
 # === Node 20, Yarn, Composer ===
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+curl -fsSL https://deb.nodesource.com/setup_20.9.0 | bash -
 apt install -y nodejs
 npm install -g yarn
 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
