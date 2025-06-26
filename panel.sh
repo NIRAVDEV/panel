@@ -37,7 +37,16 @@ chown -R www-data:www-data /var/www/mythicaldash-v3/*
 
 # === Install Backend + Frontend ===
 cd /var/www/mythicaldash-v3
-make install
+cd frontend
+yarn install --ignore-engines --force
+yarn build
+
+cd ../backend
+composer install --no-interaction --prefer-dist --optimize-autoloader
+
+
+
+
 
 # === Create MySQL DB and User ===
 mysql -u root <<EOF
