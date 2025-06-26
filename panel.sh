@@ -18,7 +18,9 @@ apt install -y php8.2 php8.2-cli php8.2-fpm php8.2-mysql php8.2-mbstring php8.2-
 
 # === MariaDB, Redis, NGINX ===
 apt install -y mariadb-server redis-server nginx
-service mariadb nginx redis-server start
+service mariadb start
+service nginx start
+service redis-server start
 
 # === Node 20, Yarn, Composer ===
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
@@ -56,17 +58,8 @@ service mariadb restart
 # === SSL: Certbot (Let's Encrypt) ===
 apt install -y certbot python3-certbot-nginx
 
-# === Generate SSL Certificate (Choose one method) ===
-
-# METHOD 1 (Preferred): Using NGINX plugin — make sure your domain points to this server and ports 80/443 are open
+# === Generate SSL Certificate (Preferred Method) ===
 certbot certonly --nginx -d "$DOMAIN"
-
-# METHOD 2 (Backup): Standalone — stop nginx first
-# systemctl stop nginx
-# certbot certonly --standalone -d "$DOMAIN"
-
-# METHOD 3 (Manual DNS challenge)
-# certbot -d "$DOMAIN" --manual --preferred-challenges dns certonly
 
 # === Configure NGINX ===
 rm -f /etc/nginx/sites-enabled/default
@@ -174,7 +167,7 @@ EOF
 
 # Enable NGINX site
 ln -sf /etc/nginx/sites-available/MythicalDashRemastered.conf /etc/nginx/sites-enabled/MythicalDashRemastered.conf
-nginx -t && systemctl reload nginx
+nginx -t && service nginx reload
 
 # === Panel Setup ===
 cd /var/www/mythicaldash-v3
@@ -188,6 +181,6 @@ php mythicaldash makeAdmin
 chown -R www-data:www-data /var/www/mythicaldash-v3/*
 
 # === SSL Auto Renewal (cron job at 11:00 PM) ===
-(crontab -l ; echo "0 23 * * * certbot renew --quiet --deploy-hook 'systemctl restart nginx'") | crontab -
+(crontab -l ; echo "0 23 * * * certbot renew --quiet --deploy-hook 'service nginx restart'") | crontab -
 
 echo "✅ MythicalDash is now running at https://${DOMAIN}"
