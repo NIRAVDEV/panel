@@ -49,6 +49,10 @@ curl -Lo MythicalDash.zip https://github.com/MythicalLTD/MythicalDash/releases/l
 unzip -o MythicalDash.zip -d .
 chown -R www-data:www-data /var/www/mythicaldash-v3/*
 
+yarn config set registry https://registry.npmjs.org
+yarn config set network-timeout 600000
+yarn cache clean
+
 # === Build Frontend ===
 cd frontend
 yarn install
