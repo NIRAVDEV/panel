@@ -11,9 +11,10 @@ echo "📦 Installing MythicalDash v3 (Node 22, PHP 8.2, NGINX)..."
 apt update && apt upgrade -y
 apt install -y software-properties-common curl ca-certificates apt-transport-https gnupg unzip git make dos2unix sudo build-essential
 
-# === PHP & Required Extensions ===
-add-apt-repository -y ppa:ondrej/php
-apt update
+# === PHP & Required Extensions 
+sudo apt update && sudo apt install software-properties-common -y
+sudo add-apt-repository ppa:ondrej/php -y
+sudo apt update
 apt install -y php8.2 php8.2-cli php8.2-fpm php8.2-mysql php8.2-mbstring php8.2-xml php8.2-curl php8.2-bcmath php8.2-zip php8.2-redis
 
 # === MariaDB, Redis, NGINX ===
@@ -23,11 +24,18 @@ service nginx start
 service redis-server start
 
 # === Install NVM + Node.js 22 ===
+# Install NVM
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+# Load NVM (important for non-login shell)
 export NVM_DIR="$HOME/.nvm"
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
 source "$NVM_DIR/nvm.sh"
+
+# Install and use Node 22
 nvm install 22
 nvm use 22
+
+# Set it as default
 nvm alias default 22
 
 # === Yarn & Composer ===
