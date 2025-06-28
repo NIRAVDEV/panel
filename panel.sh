@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 # Update package lists and upgrade the system
@@ -7,21 +6,28 @@ apt-get update
 apt-get upgrade -y
 
 # Install dependencies
-apt-get install -y git curl wget sudo neofetch unzip software-properties-common mariadb-server redis nginx certbot php php-cli php-fpm php-json php-mysql php-zip php-gd php-mbstring php-curl php-xml php-pear composer
+apt-get install -y git curl wget sudo neofetch unzip software-properties-common mariadb-server redis nginx certbot php php-cli php-fpm php-json php-mysql php-pdo php-gd php-mbstring php-tokenizer php-xml php-curl php-zip php-opcache
 
-# Add PHP 8.1 repository (you may need to adjust this for different versions)
-add-apt-repository ppa:ondrej/php -y
-apt-get update
-apt-get install -y php8.1-cli php8.1-fpm php8.1-json php8.1-mysql php8.1-zip php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml
+# Install Composer
+php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+php composer-setup.php
+php -r "unlink('composer-setup.php');"
+mv composer.phar /usr/local/bin/composer
+chmod +x /usr/local/bin/composer
 
-# Configure Nginx (replace example.com with your domain)
+# Set timezone non-interactively
+tzselect <<< $'1\n9\n' | tee /etc/timezone
+dpkg-reconfigure --frontend noninteractive tzdata
+
+# Configure Nginx
 rm /etc/nginx/sites-available/default
 rm /etc/nginx/sites-enabled/default
 
-cat <<EOF >/etc/nginx/sites-available/mythicaldash
+cat <<EOF >/etc/nginx/sites-available/mythicaldash.conf
 server {
     listen 80;
-    server_name example.com;
+    listen [::]:80;
+    server_name _; # Replace with your domain or IP address
     root /var/www/mythicaldash/public;
 
     index index.php index.html index.htm;
@@ -32,56 +38,65 @@ server {
 
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.1-fpm.sock; # Adjust PHP version if needed
+        fastcgi_pass unix:/run/php/php7.4-fpm.sock; # Adjust if needed
     }
 
     location ~ /\.ht {
         deny all;
     }
+
+    # Certbot configuration (SSL - optional, configure after install)
+    # location /.well-known/acme-challenge {
+    #     allow all;
+    # }
 }
 EOF
 
-ln -s /etc/nginx/sites-available/mythicaldash /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/mythicaldash.conf /etc/nginx/sites-enabled/mythicaldash.conf
 
-# Reload Nginx
+nginx -t
 systemctl restart nginx
 
-# Optionally, set up Let's Encrypt SSL (replace example.com with your domain)
-# certbot --nginx -d example.com -n --agree-tos --email your_email@example.com
-
 # Set up MariaDB database and user
-MYSQL_ROOT_PASSWORD="root_password"
-MYSQL_DATABASE="mythicaldash"
+MYSQL_ROOT_PASSWORD="changeme"
 MYSQL_USER="mythicaldash"
-MYSQL_PASSWORD="dash_password"
+MYSQL_PASSWORD="changeme"
+MYSQL_DATABASE="mythicaldash"
 
-# Secure MySQL installation
-# mysql_secure_installation
+export DEBIAN_FRONTEND=noninteractive
 
-cat <<EOF | mysql -u root -p${MYSQL_ROOT_PASSWORD}
-CREATE DATABASE IF NOT EXISTS ${MYSQL_DATABASE};
-CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
-GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';
-FLUSH PRIVILEGES;
-EOF
+# Install mariadb-server without prompting for password
+debconf-set-selections <<< "mariadb-server mysql-server/root_password password $MYSQL_ROOT_PASSWORD"
+debconf-set-selections <<< "mariadb-server mysql-server/root_password_again password $MYSQL_ROOT_PASSWORD"
 
-# Download MythicalDash
+
+
+mysql -u root -e "CREATE DATABASE IF NOT EXISTS 
+`$MYSQL_DATABASE`;"
+mysql -u root -e "CREATE USER IF NOT EXISTS '$MYSQL_USER'@'localhost' IDENTIFIED BY '$MYSQL_PASSWORD';"
+mysql -u root -e "GRANT ALL PRIVILEGES ON 
+`$MYSQL_DATABASE`.* TO '$MYSQL_USER'@'localhost';"
+mysql -u root -e "FLUSH PRIVILEGES;"
+
+# Download MythicalDash from Git repository
 cd /var/www/
 git clone https://github.com/MythicalLTD/MythicalDash.git
 cd mythicaldash
 
-# Install PHP dependencies
+# Install PHP dependencies with Composer
 composer install --no-interaction --optimize-autoloader
 
-# Set up environment variables
+# Set up environment variables (replace with secure random strings later!)
 cp .env.example .env
-# Modify .env file with correct database credentials and app URL
-sed -i "s/DB_DATABASE=homestead/DB_DATABASE=${MYSQL_DATABASE}/g" .env
-sed -i "s/DB_USERNAME=homestead/DB_USERNAME=${MYSQL_USER}/g" .env
-sed -i "s/DB_PASSWORD=secret/DB_PASSWORD=${MYSQL_PASSWORD}/g" .env
-sed -i "s/APP_URL=http:\/\/localhost/APP_URL=http:\/\/example.com/g" .env # Replace example.com
+sed -i "s/APP_NAME=Laravel/APP_NAME=MythicalDash/g" .env
+sed -i "s/APP_URL=http:\/\/localhost/APP_URL=http:\/\/your_ip_or_domain/g" .env
+sed -i "s/DB_DATABASE=laravel/DB_DATABASE=$MYSQL_DATABASE/g" .env
+sed -i "s/DB_USERNAME=root/DB_USERNAME=$MYSQL_USER/g" .env
+sed -i "s/DB_PASSWORD=/DB_PASSWORD=$MYSQL_PASSWORD/g" .env
+sed -i "s/REDIS_HOST=127.0.0.1/REDIS_HOST=127.0.0.1/g" .env
+sed -i "s/REDIS_PASSWORD=null/REDIS_PASSWORD=/g" .env
 
-# Generate app key
+# Generate APP_KEY
 php artisan key:generate
 
 # Run database migrations and seeders
@@ -98,23 +113,32 @@ cat <<EOF >/etc/systemd/system/mythicaldash-queue.service
 [Unit]
 Description=MythicalDash Queue Worker
 After=redis.service
-Requires=redis.service
 
 [Service]
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/mythicaldash
-ExecStart=php artisan queue:work --tries=3
-Restart=on-failure
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable mythicaldash-queue.service
-systemctl start mythicaldash-queue.service
+systemctl enable mythicaldash-queue
+systemctl start mythicaldash-queue
 
-# Display completion message
-echo "MythicalDash installation complete!"
-echo "Access your MythicalDash instance at http://example.com (replace with your actual domain)."
+
+echo ""
+echo "------------------------------------------------------------------"
+echo "|                                                                |"
+echo "|                 MythicalDash Installation Complete!                |"
+echo "|                                                                |"
+echo "------------------------------------------------------------------"
+echo ""
+echo "Next Steps:"
+echo "1. Navigate to your server's IP address in a browser."
+echo "2. Complete the setup process."
+echo "3. Create your admin account."
+echo ""
