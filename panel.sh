@@ -2,171 +2,37 @@
 
 set -e
 
-DOMAIN="example.com"  # ← CHANGE THIS to your domain
-DB_PASSWORD="yourSecurePassword"  # ← CHANGE this password
+# Update package lists and upgrade the system
+apt-get update
+apt-get upgrade -y
 
-echo "📦 Installing MythicalDash v3 (Node 22, PHP 8.2, NGINX)..."
+# Install dependencies
+apt-get install -y git curl wget sudo neofetch unzip software-properties-common mariadb-server redis nginx certbot php php-cli php-fpm php-json php-mysql php-zip php-gd php-mbstring php-curl php-xml php-pear composer
 
-# === Update System ===
-apt update && apt upgrade -y
-apt install -y software-properties-common curl ca-certificates apt-transport-https gnupg unzip git make dos2unix sudo build-essential
+# Add PHP 8.1 repository (you may need to adjust this for different versions)
+add-apt-repository ppa:ondrej/php -y
+apt-get update
+apt-get install -y php8.1-cli php8.1-fpm php8.1-json php8.1-mysql php8.1-zip php8.1-gd php8.1-mbstring php8.1-curl php8.1-xml
 
-# === PHP & Required Extensions 
-sudo apt update && sudo apt install software-properties-common -y
-sudo add-apt-repository ppa:ondrej/php -y
-sudo apt update
-apt install -y php8.2 php8.2-cli php8.2-fpm php8.2-mysql php8.2-mbstring php8.2-xml php8.2-curl php8.2-bcmath php8.2-zip php8.2-redis
+# Configure Nginx (replace example.com with your domain)
+rm /etc/nginx/sites-available/default
+rm /etc/nginx/sites-enabled/default
 
-# === MariaDB, Redis, NGINX ===
-apt install -y mariadb-server redis-server nginx
-service mariadb start
-service nginx start
-service redis-server start
-
-# === Install NVM + Node.js 22 ===
-# Install NVM
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-
-# Load NVM (important for non-login shell)
-export NVM_DIR="$HOME/.nvm"
-source "$NVM_DIR/nvm.sh"
-
-# Install and use Node 22
-nvm install 22
-nvm use 22
-
-# Set it as default
-nvm alias default 22
-
-# === Yarn & Composer ===
-npm install -g yarn
-curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-
-# === Download MythicalDash ===
-mkdir -p /var/www/mythicaldash-v3
-cd /var/www/mythicaldash-v3
-curl -Lo MythicalDash.zip https://github.com/MythicalLTD/MythicalDash/releases/latest/download/MythicalDash.zip
-unzip -o MythicalDash.zip -d .
-chown -R www-data:www-data /var/www/mythicaldash-v3/*
-
-yarn config set registry https://registry.npmjs.org
-yarn config set network-timeout 600000
-yarn cache clean
-
-# === Build Frontend ===
-cd frontend
-yarn install
-yarn build
-
-# === Install Backend Dependencies ===
-cd ../backend
-composer install --no-interaction --prefer-dist --optimize-autoloader
-
-# === MySQL Setup ===
-mysql -u root <<EOF
-CREATE USER 'mythicaldash_remastered'@'127.0.0.1' IDENTIFIED BY '${DB_PASSWORD}';
-CREATE DATABASE mythicaldash_remastered;
-GRANT ALL PRIVILEGES ON mythicaldash_remastered.* TO 'mythicaldash_remastered'@'127.0.0.1' WITH GRANT OPTION;
-FLUSH PRIVILEGES;
-EOF
-
-# === MariaDB Charset Config ===
-sed -i '/^#collation-server/a collation-server = utf8mb4_general_ci' /etc/mysql/mariadb.conf.d/50-server.cnf
-sed -i '/^character-set-server/s/^/#/g' /etc/mysql/mariadb.conf.d/50-server.cnf
-sed -i '/^#character-set-server/a character-set-server = utf8mb4' /etc/mysql/mariadb.conf.d/50-server.cnf
-sed -i '/^character-set-collations/s/^/#/g' /etc/mysql/mariadb.conf.d/50-server.cnf
-sed -i '/^#character-set-collations/a character-set-collations = utf8mb4' /etc/mysql/mariadb.conf.d/50-server.cnf
-service mariadb restart
-
-# === Certbot SSL ===
-apt install -y certbot python3-certbot-nginx
-certbot certonly --nginx -d "$DOMAIN"
-
-# === Configure NGINX ===
-rm -f /etc/nginx/sites-enabled/default
-cat > /etc/nginx/sites-available/MythicalDashRemastered.conf <<EOF
+cat <<EOF >/etc/nginx/sites-available/mythicaldash
 server {
     listen 80;
-    server_name ${DOMAIN};
-    return 301 https://\$server_name\$request_uri;
-}
+    server_name example.com;
+    root /var/www/mythicaldash/public;
 
-server {
-    listen 443 ssl http2;
-    server_name ${DOMAIN};
-
-    root /var/www/mythicaldash-v3/frontend/dist;
-    index index.html;
-
-    client_max_body_size 100m;
-    client_body_timeout 120s;
-    sendfile off;
-
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-
-    ssl_session_cache shared:SSL:10m;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-    add_header X-Robots-Tag "index, follow";
-    add_header Content-Security-Policy "frame-ancestors 'self'";
-    add_header X-Frame-Options DENY;
-    add_header Referrer-Policy same-origin;
-
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    location /mc-admin {
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://localhost:6000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-    }
-
-    location /i/ {
-        proxy_pass http://localhost:6000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location /attachments {
-        alias /var/www/mythicaldash-v3/backend/public/attachments;
-    }
-}
-
-server {
-    listen 6000;
-    server_name localhost;
-    root /var/www/mythicaldash-v3/backend/public;
-    index index.php;
-
-    client_max_body_size 100m;
-    client_body_timeout 120s;
-    sendfile off;
-    error_log /var/www/mythicaldash-v3/backend/storage/logs/mythicaldash-v3.log error;
+    index index.php index.html index.htm;
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
-        include fastcgi_params;
     }
 
-    location ~ \.php\$ {
-        fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-        fastcgi_index index.php;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        fastcgi_param HTTP_PROXY "";
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock; # Adjust PHP version if needed
     }
 
     location ~ /\.ht {
@@ -175,21 +41,80 @@ server {
 }
 EOF
 
-ln -sf /etc/nginx/sites-available/MythicalDashRemastered.conf /etc/nginx/sites-enabled/MythicalDashRemastered.conf
-nginx -t && service nginx reload
+ln -s /etc/nginx/sites-available/mythicaldash /etc/nginx/sites-enabled/
 
-# === MythicalDash Setup ===
-cd /var/www/mythicaldash-v3
-php mythicaldash setup
-php mythicaldash migrate
-php mythicaldash pterodactyl configure
-php mythicaldash init
-php mythicaldash makeAdmin
+# Reload Nginx
+systemctl restart nginx
 
-# === Permissions Fix ===
-chown -R www-data:www-data /var/www/mythicaldash-v3/*
+# Optionally, set up Let's Encrypt SSL (replace example.com with your domain)
+# certbot --nginx -d example.com -n --agree-tos --email your_email@example.com
 
-# === SSL Auto Renew (Cron) ===
-(crontab -l 2>/dev/null; echo "0 23 * * * certbot renew --quiet --deploy-hook 'service nginx reload'") | crontab -
+# Set up MariaDB database and user
+MYSQL_ROOT_PASSWORD="root_password"
+MYSQL_DATABASE="mythicaldash"
+MYSQL_USER="mythicaldash"
+MYSQL_PASSWORD="dash_password"
 
-echo "✅ MythicalDash installed and running at https://${DOMAIN}"
+# Secure MySQL installation
+# mysql_secure_installation
+
+cat <<EOF | mysql -u root -p${MYSQL_ROOT_PASSWORD}
+CREATE DATABASE IF NOT EXISTS ${MYSQL_DATABASE};
+CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';
+FLUSH PRIVILEGES;
+EOF
+
+# Download MythicalDash
+cd /var/www/
+git clone https://github.com/MythicalLTD/MythicalDash.git
+cd mythicaldash
+
+# Install PHP dependencies
+composer install --no-interaction --optimize-autoloader
+
+# Set up environment variables
+cp .env.example .env
+# Modify .env file with correct database credentials and app URL
+sed -i "s/DB_DATABASE=homestead/DB_DATABASE=${MYSQL_DATABASE}/g" .env
+sed -i "s/DB_USERNAME=homestead/DB_USERNAME=${MYSQL_USER}/g" .env
+sed -i "s/DB_PASSWORD=secret/DB_PASSWORD=${MYSQL_PASSWORD}/g" .env
+sed -i "s/APP_URL=http:\/\/localhost/APP_URL=http:\/\/example.com/g" .env # Replace example.com
+
+# Generate app key
+php artisan key:generate
+
+# Run database migrations and seeders
+php artisan migrate --force
+php artisan db:seed --force
+
+# Set correct file permissions
+chown -R www-data:www-data /var/www/mythicaldash
+chmod -R 755 /var/www/mythicaldash/storage
+chmod -R 755 /var/www/mythicaldash/bootstrap/cache
+
+# Create a systemd service to manage the MythicalDash queue worker
+cat <<EOF >/etc/systemd/system/mythicaldash-queue.service
+[Unit]
+Description=MythicalDash Queue Worker
+After=redis.service
+Requires=redis.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/mythicaldash
+ExecStart=php artisan queue:work --tries=3
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable mythicaldash-queue.service
+systemctl start mythicaldash-queue.service
+
+# Display completion message
+echo "MythicalDash installation complete!"
+echo "Access your MythicalDash instance at http://example.com (replace with your actual domain)."
