@@ -6,7 +6,7 @@ apt-get update
 apt-get upgrade -y
 
 # Install dependencies
-apt-get install -y git curl wget sudo neofetch unzip software-properties-common mariadb-server redis nginx certbot php php-cli php-fpm php-json php-mysql php-pdo php-gd php-mbstring php-tokenizer php-xml php-curl php-zip php-opcache
+apt-get install -y git curl wget sudo neofetch unzip software-properties-common mariadb-server redis nginx certbot php8.2 php8.2-cli php8.2-fpm php8.2-json php8.2-mysql php8.2-pdo php8.2-gd php8.2-mbstring php8.2-tokenizer php8.2-xml php8.2-curl php8.2-zip php8.2-opcache
 
 # Install Composer
 php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
@@ -55,7 +55,7 @@ EOF
 ln -s /etc/nginx/sites-available/mythicaldash.conf /etc/nginx/sites-enabled/mythicaldash.conf
 
 nginx -t
-systemctl restart nginx
+service nginx start
 
 # Set up MariaDB database and user
 MYSQL_ROOT_PASSWORD="changeme"
