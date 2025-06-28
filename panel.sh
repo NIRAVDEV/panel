@@ -2,6 +2,8 @@
 set -e
 
 # Update package lists and upgrade the system
+apt update && sudo apt install software-properties-common -y
+add-apt-repository ppa:ondrej/php -y
 apt-get update
 apt-get upgrade -y
 
