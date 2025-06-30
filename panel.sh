@@ -164,7 +164,7 @@ NGINX_CONF_PATH="/etc/nginx/sites-available/MythicalDashRemastered.conf"
 echo "Creating Nginx configuration file at $NGINX_CONF_PATH" | tee -a "$LOG_FILE"
 sudo bash -c "cat << 'EOF_NGINX' > $NGINX_CONF_PATH
 server {
-    listen 8089;
+    listen 8080;
     server_name ${DOMAIN};
     return 301 https://\$server_name\$request_uri;
 }
