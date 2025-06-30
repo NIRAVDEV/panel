@@ -127,7 +127,22 @@ echo "Setting up Cron jobs..." | tee -a "$LOG_FILE"
 (crontab -l 2>/dev/null; echo "* * * * * php /var/www/mythicaldash-v3/backend/storage/cron/runner.php >> /dev/null 2>&1") | crontab -
 
 echo "Running MythicalDash setup and migration..." | tee -a "$LOG_FILE"
-log_command php mythicaldash setup
+# ... (previous script content) ...
+
+echo "Running MythicalDash setup and migration..." | tee -a "$LOG_FILE"
+# Interactive php commands, piping inputs based on the provided image
+log_command php mythicaldash setup <<EOF
+xchacha20
+mythicaldash_remastered
+127.0.0.1
+3306
+mythicaldash_remastered
+$DB_PASSWORD
+EOF
+log_command php mythicaldash migrate
+
+# ... (rest of the script content) ...
+
 log_command php mythicaldash migrate
 
 echo "Configuring Pterodactyl settings..." | tee -a "$LOG_FILE"
