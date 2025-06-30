@@ -66,6 +66,16 @@ else
     exit 1
 fi
 
+echo "Installing NVM and Node.js 22..." | tee -a "$LOG_FILE"
+log_command curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+log_command nvm install 22
+log_command nvm use 22
+
 echo "Installing Composer..." | tee -a "$LOG_FILE"
 log_command curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
 
